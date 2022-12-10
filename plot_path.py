@@ -2,43 +2,15 @@
 
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
 import os 
-
-fig, ax = plt.subplots()
-
-def init_plot(x,y,s,c):
-    p = ax.scatter(x,y,s = 20, c = 'g')
-    return(p)
-
-def update_plot(p,x,y,offset=20,zoom=10):
-    global ax 
-    p.set_offsets(np.c_[x,y])
-
-    if len(x)<zoom:
-        xmax,xmin= max(x),min(x)
-        ymax,ymin = max(y),min(y)
-    else: 
-        xmax,xmin= max(x[-zoom:]),min(x[-zoom:])
-        ymax,ymin = max(y[-zoom:]),min(y[-zoom:])
-
-    ax.axis([xmin - offset, xmax + offset, ymin -offset, ymax + offset])
-    ax.set_aspect('equal')
-    fig.canvas.draw()
-    plt.pause(0.001)
-    return(p)
-
-
-def dynamic_plot(x,y,step=10,s = 20, c = 'g'):
-    p = init_plot(x[0],y[0],20,'b')
-    leng = len(x)
-    for i in range(0,leng,step):
-        xi,yi = x[:i+1],y[:i+1]
-        print(i)
-        update_plot(p,xi,yi,offset=20,zoom=0)
+from viz import myplot
 
 
 def load_to_RAM(file):
+    r"""
+    Loads path (in the file) to RAM memory
+    
+    """
     assert os.path.isfile(file)
     pose_array = []
     for line in open(file):
@@ -48,23 +20,49 @@ def load_to_RAM(file):
     return(np.array(pose_array))
 
 
+def plot_on_gif(pose:np.ndarray, dest_file:str, record_gif=False, frame_jump=1, init_frame = 100):
+    
+    r"""
+     Plots te path online or as gif. 
+
+     Args:
+       - pose [nx2] array  
+       - dest_file [str] name of the destination file (only used if record_gif is one)
+       - record_gif [bool] (default: False) Flag that defines if plot is saved as GIF
+       - fame_jump [int] [Hz] Number frames are dropped at each jump
+       - init_frame [int] Initial Frame
+
+    """
+    
+    plot = myplot(delay = 0.01)
+    plot.init_plot(pose[:,0],pose[:,1],c='black',s=10)
+    plot.xlabel('m')
+    plot.ylabel('m')
+
+    if record_gif == True:
+        plot.record_gif(dest_file)
+
+    num_samples = pose.shape[0]
+    for i in range(init_frame,num_samples,frame_jump):
+        color = np.array(['k']*i)
+        color[i-1]='y'
+        plot.update_plot(pose[:i,0],pose[:i,1], color = color , offset= 1, zoom=-1)
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
 
     parser.add_argument("--seq", #default='/home/tiago/Dropbox/research/datasets/orchard-uk/orchard1/pose.txt', 
-                                     default='/home/tiago/Dropbox/research/datasets/FUBerlin/toyexample/vehicleA',
+                                     default='/media/tiago/vbig/dataset/orchard-uk/winter',
                                     help = "")
     args = parser.parse_args()
 
     #run1 = '/home/tiago/Dropbox/research/datasets/orchard-uk/rerecord_sparce/pose.txt'
-    run1 = os.path.join(args.seq,'pose.txt')
-    fig, ax = plt.subplots()
+    run1 = os.path.join(args.seq,'raw_gps.txt')
 
     path1 = load_to_RAM(run1)
-    #path2 = load_to_RAM(run2)
+    plot_on_gif(path1,'test.gif',record_gif=True,frame_jumps=10)
 
-    #assert len(path1) == len(path2)
-    dynamic_plot(path1[:,0],path1[:,1])
-    plt.show()
 
 
