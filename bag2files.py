@@ -86,14 +86,14 @@ def extract_bag_data(bag_files,topics,root):
         #print(topic)
         #print('{:30s}: {:10s} delta: {:10s}'.format(topic,str(t),str(delta)))
 
-        if topic == topics['pose']:
+        if 'pose' in topics and topic == topics['pose']:
             ft.write(str(t) + '\n')
             pose = GeometryMsg2str(msg.pose)
             fp.write(pose + '\n')
             pose_counter +=1
         
         elif 'raw_gps' in topics and  topic == topics['raw_gps']:
-            gps_pose = NavSatFix2local(msg)
+            gps_pose = NavSatFix2local(msg) # 
             if raw_gps_counter == 0:
                 gps_pose0 = gps_pose.copy()
             gps_pose -= gps_pose0
@@ -124,8 +124,8 @@ def extract_bag_data(bag_files,topics,root):
     fp.close()
     fvt.close()
 
-    print(f'pose: {pose_counter}  velodyne: {velodyne_counter}')
-    return(i)
+    print(f'pose: {pose_counter}  velodyne: {velodyne_counter} gps: {raw_gps_counter}')
+    #return(i)
 
 
 
@@ -134,11 +134,11 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
 
-    parser.add_argument("--root", default='/home/tiago/Dropbox/research/datasets/FUBerlin/toyexample/vehicleB',
+    parser.add_argument("--root", default='/media/tiago/vbig/dataset/orchard-uk/winter',
                                     #default='/home/tiago/Dropbox/research/datasets/orchard-fr/ouster',
                                     help = "KITTI dataset type")
     parser.add_argument("--cfg", default = 'topics2read.yaml')
-    parser.add_argument("--bag",default='v128.bag')
+    parser.add_argument("--bag",default='winterOrchard.bag')
     args = parser.parse_args()
 
     root = args.root
