@@ -6,7 +6,7 @@ import os
 from viz import myplot
 
 
-def load_to_RAM(file):
+def load_to_RAM(file: str):
     r"""
     Loads path (in the file) to RAM memory
     
@@ -20,7 +20,7 @@ def load_to_RAM(file):
     return(np.array(pose_array))
 
 
-def plot_on_gif(pose:np.ndarray, dest_file:str, record_gif=False, frame_jump=1, init_frame = 100):
+def plot_on_gif(pose: np.ndarray, dest_file:str, record_gif: bool =False, frame_jumps: int =1, init_frame: int  = 100):
     
     r"""
      Plots te path online or as gif. 
@@ -43,7 +43,7 @@ def plot_on_gif(pose:np.ndarray, dest_file:str, record_gif=False, frame_jump=1, 
         plot.record_gif(dest_file)
 
     num_samples = pose.shape[0]
-    for i in range(init_frame,num_samples,frame_jump):
+    for i in range(init_frame,num_samples,frame_jumps):
         color = np.array(['k']*i)
         color[i-1]='y'
         plot.update_plot(pose[:i,0],pose[:i,1], color = color , offset= 1, zoom=-1)
@@ -52,14 +52,12 @@ def plot_on_gif(pose:np.ndarray, dest_file:str, record_gif=False, frame_jump=1, 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-
-    parser.add_argument("--seq", #default='/home/tiago/Dropbox/research/datasets/orchard-uk/orchard1/pose.txt', 
-                                     default='/media/tiago/vbig/dataset/orchard-uk/winter',
+    parser.add_argument("--pose_file",
+                                     default='/home/tiago/Dropbox/research/datasets/orchard-uk/orchard1/pose.txt',
                                     help = "")
     args = parser.parse_args()
 
-    #run1 = '/home/tiago/Dropbox/research/datasets/orchard-uk/rerecord_sparce/pose.txt'
-    run1 = os.path.join(args.seq,'raw_gps.txt')
+    run1 = args.pose_file
 
     path1 = load_to_RAM(run1)
     plot_on_gif(path1,'test.gif',record_gif=True,frame_jumps=10)
