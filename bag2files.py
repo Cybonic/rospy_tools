@@ -76,15 +76,16 @@ def extract_bag_data(bag_files,topics,root):
     gps_pose0        = 0 
     
     #for bag_file in tqdm(bag_files):
+    #with tqdm(total=100) as pbar:
+
     bag = rosbag.Bag(bag_files)
-    for i,(topic, msg, t) in enumerate(bag.read_messages(topics=topic_list)):
+    for i,(topic, msg, t) in tqdm(enumerate(bag.read_messages(topics=topic_list)),'Reading from Topics'):
         if i == 0:
             t0 = t
         
         delta = (t-t0)
         t0=t
-        #print(topic)
-        #print('{:30s}: {:10s} delta: {:10s}'.format(topic,str(t),str(delta)))
+
 
         if 'pose' in topics and topic == topics['pose']:
             ft.write(str(t) + '\n')
@@ -93,6 +94,7 @@ def extract_bag_data(bag_files,topics,root):
             pose_counter +=1
         
         elif 'raw_gps' in topics and  topic == topics['raw_gps']:
+            ftrgps.write(str(t) + '\n')
             gps_pose = NavSatFix2local(msg) # 
             if raw_gps_counter == 0:
                 gps_pose0 = gps_pose.copy()
@@ -123,9 +125,10 @@ def extract_bag_data(bag_files,topics,root):
     ft.close()
     fp.close()
     fvt.close()
-
+    print("="*50)
     print(f'pose: {pose_counter}  velodyne: {velodyne_counter} gps: {raw_gps_counter}')
-    #return(i)
+    print("="*50)
+
 
 
 
@@ -133,33 +136,18 @@ if __name__ == '__main__':
     
     
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-
-    #parser.add_argument("--root", default='/media/tiago/vbig/dataset/orchard-uk/winter',
-    #                                #default='/home/tiago/Dropbox/research/datasets/orchard-fr/ouster',
-    #                                help = "KITTI dataset type")
     parser.add_argument("--cfg", default = 'topics2read.yaml')
-    parser.add_argument("--bag",default='winterOrchard.bag')
+    parser.add_argument("--bag",default='~/Dropbox/research/datasets/orchard-uk/winter/winterOrchard.bag')
     args = parser.parse_args()
 
-    #root = args.root
-    cfg = args.cfg
 
-    #assert os.path.isdir(root),'There is no such directory: ' + root
-    #bag_dir = os.path.join(root,'bagfiles')
-    #cfg_file = os.path.join(bag_dir,cfg)
+    cfg = args.cfg
     assert os.path.isfile(cfg)
 
     cfg = yaml.load(open(cfg))
     bag_file = args.bag
-    # bag_files_sort = bag_file
-    #bag_files = np.array([os.path.join(bag_dir,file) for file in os.listdir(bag_dir)])
-    #bag_files = [file  for file in bag_files if file.split('.')[-1] == 'bag']
-    #bag_files_int = [int(file.split('_')[-1].split('/')[-1].split('.')[0]) for file in bag_files]
-    #print(bag_files[:,1])
-    #idx =  np.argsort(bag_files_int)
-    #bag_files_sort = np.array(bag_files)[idx]   
     print(bag_file)
- 
+    
     topic_to_read = list(cfg['topics'].values())
 
-    extract_bag_data(bag_file,cfg['topics'],'');
+    extract_bag_data(bag_file,cfg['topics'],'')
