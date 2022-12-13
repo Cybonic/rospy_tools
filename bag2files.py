@@ -134,32 +134,32 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
 
-    parser.add_argument("--root", default='/media/tiago/vbig/dataset/orchard-uk/winter',
-                                    #default='/home/tiago/Dropbox/research/datasets/orchard-fr/ouster',
-                                    help = "KITTI dataset type")
+    #parser.add_argument("--root", default='/media/tiago/vbig/dataset/orchard-uk/winter',
+    #                                #default='/home/tiago/Dropbox/research/datasets/orchard-fr/ouster',
+    #                                help = "KITTI dataset type")
     parser.add_argument("--cfg", default = 'topics2read.yaml')
     parser.add_argument("--bag",default='winterOrchard.bag')
     args = parser.parse_args()
 
-    root = args.root
+    #root = args.root
     cfg = args.cfg
 
-    assert os.path.isdir(root),'There is no such directory: ' + root
-    bag_dir = os.path.join(root,'bagfiles')
-    cfg_file = os.path.join(bag_dir,cfg)
-    assert os.path.isfile(cfg_file)
+    #assert os.path.isdir(root),'There is no such directory: ' + root
+    #bag_dir = os.path.join(root,'bagfiles')
+    #cfg_file = os.path.join(bag_dir,cfg)
+    assert os.path.isfile(cfg)
 
-    cfg = yaml.load(open(cfg_file))
-    bag_file = os.path.join(bag_dir,args.bag)
-    bag_files_sort = bag_file
+    cfg = yaml.load(open(cfg))
+    bag_file = args.bag
+    # bag_files_sort = bag_file
     #bag_files = np.array([os.path.join(bag_dir,file) for file in os.listdir(bag_dir)])
     #bag_files = [file  for file in bag_files if file.split('.')[-1] == 'bag']
     #bag_files_int = [int(file.split('_')[-1].split('/')[-1].split('.')[0]) for file in bag_files]
     #print(bag_files[:,1])
     #idx =  np.argsort(bag_files_int)
     #bag_files_sort = np.array(bag_files)[idx]   
-    print(bag_files_sort)
+    print(bag_file)
  
     topic_to_read = list(cfg['topics'].values())
 
-    extract_bag_data(bag_files_sort,cfg['topics'],root)
+    extract_bag_data(bag_file,cfg['topics'],'');
