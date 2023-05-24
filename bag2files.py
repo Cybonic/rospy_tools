@@ -20,6 +20,31 @@ import yaml
 from tqdm import tqdm
 import ros_numpy
 
+import math
+
+
+def euler_from_quaternion(x, y, z, w):
+        """
+        Convert a quaternion into euler angles (roll, pitch, yaw)
+        roll is rotation around x in radians (counterclockwise)
+        pitch is rotation around y in radians (counterclockwise)
+        yaw is rotation around z in radians (counterclockwise)
+        """
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll_x = math.atan2(t0, t1)
+     
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        pitch_y = math.asin(t2)
+     
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw_z = math.atan2(t3, t4)
+     
+        return roll_x, pitch_y, yaw_z # in radians
+
 
 def NavSatFix2local(nav):
     import utm
@@ -103,12 +128,11 @@ def extract_bag_data(bag_files,topics,root):
             gps_pose_str = '{} {}'.format(gps_pose[0],gps_pose[1])
             frgps.write(gps_pose_str + '\n')
             raw_gps_counter+=1
+        
         elif topic == topics['point-cloud']:
-            
             if first_flag == 0:
                 first_flag = 1
                 i0 = i
-
             name = os.path.join(velodyne_dir,'{0:07d}.bin'.format(velodyne_counter))
             #msg.
             pcl = open(name,'wb')
@@ -136,8 +160,8 @@ if __name__ == '__main__':
     
     
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--cfg", default = 'topics2read.yaml')
-    parser.add_argument("--bag",default='~/Dropbox/research/datasets/orchard-uk/winter/winterOrchard.bag')
+    parser.add_argument("--cfg", default = '/media/tiago/vbig/dataset/orchard-uk/winter/bagfiles/topics2read.yaml')
+    parser.add_argument("--bag",default='/media/tiago/vbig/dataset/FU_Odometry_Dataset/rawbags/32/20171025-153721.bag')
     args = parser.parse_args()
 
 
