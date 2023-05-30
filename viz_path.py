@@ -53,14 +53,15 @@ def plot_on_gif(pose: np.ndarray, dest_file:str, record_gif: bool =False, frame_
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
     parser.add_argument("--pose_file",
-                                     default='/home/tiago/Dropbox/research/datasets/orchard-uk/orchard1/pose.txt',
+                                     #default='/media/tiago/vbig/dataset/FU_Odometry_Dataset/64LiDAR/20190924-143337/pose.txt',
+                                     default='20190924-144057/pose.txt',
                                     help = "")
     args = parser.parse_args()
 
     run1 = args.pose_file
 
     path1 = load_to_RAM(run1)
-    plot_on_gif(path1,'test.gif',record_gif=True,frame_jumps=10)
+    plot_on_gif(path1,'test.gif',record_gif=False,frame_jumps=500)
 
 
 

@@ -84,5 +84,3 @@ def run_test():
         print(">> ECEF (XYZ)\t = ", xF, yF, zF)
         print('>> ENU (XYZ) \t = ', xE, yN, zU)
         print('-'*100)
-
-if __name__ == 
