@@ -1,28 +1,20 @@
 import os
-from sre_parse import FLAGS
-import cv2
-import rospy
-import progressbar
-
-from datetime import datetime
-from std_msgs.msg import Header
-from sensor_msgs.msg import CameraInfo, Imu, PointField, NavSatFix
-import sensor_msgs.point_cloud2 as pcl2
-#from sensor_msgs import PointCloud
-import sensor_msgs.point_cloud2
-from geometry_msgs.msg import TransformStamped, TwistStamped, Transform
-from cv_bridge import CvBridge
 import numpy as np
 import argparse
 import rosbag
-from std_msgs.msg import Int32, String
 import yaml
 from tqdm import tqdm
-import ros_numpy
 from simplekml import Kml # https://simplekml.readthedocs.io/en/latest/kml.html
 
 import math
 
+
+"""
+    TO-DO:
+     - Bag counter: a counter that contains the number of bags that each sequence has.
+     - Bag Tracker: as the bags are loaded add a the current bag number and the total of bags: eg, 3/10
+    
+"""
 
 def euler_from_quaternion(x, y, z, w):
         """
@@ -85,44 +77,45 @@ def position2str(msg):
     return ' '.join([str(msg.x),str(msg.y),str(msg.z)])  
 
 def save_gps_to_kmz(bag_files,topic_dict,dst_root,dst_dir,skip=1):
-    
+    print("\nI'm in the Core Function")
     dst_dir_root  = os.path.join(dst_root,dst_dir)
     if not os.path.isdir(dst_dir_root):
+        print("New directory: " + dst_dir_root)
         os.makedirs(dst_dir_root)
 
-    raw_gps_file = os.path.join(dst_dir_root,'raw_gps.kmz')
-
+    raw_gps_file = os.path.join(dst_root,dst_dir+'.kmz')
+    print("\nKMZ FILE: "+raw_gps_file)
     topic_list = list(topic_dict.values())
     raw_gps_counter  = 1
     counter = 1
-    
     kml = Kml(name=dst_dir)
-    bag = rosbag.Bag(bag_files)
-    for i,(topic, msg, t) in tqdm(enumerate(bag.read_messages(topics=topic_list)),'Reading from Topics'):
-        if i == 0:
-            t0 = t
-        delta = (t-t0)
-        t0=t
+    for bag_file in bag_files:
+        print("Bag to be open: " + bag_file)
+        bag = rosbag.Bag(bag_file)
+        for i,(topic, msg, t) in tqdm(enumerate(bag.read_messages(topics=topic_list)),'Reading from Topics'):
+            if i == 0:
+                t0 = t
+            delta = (t-t0)
+            t0=t
 
+            counter +=1
 
-        counter +=1
+            if counter%skip !=0:
+                continue
 
-        if counter%skip !=0:
-            continue
+            if 'pose' in topic_dict and topic == topic_dict['pose']:
+                
+                if 'Odometry' in msg._type:
+                    data = parseGeometryMsg(msg)
+                    pose = data['p']
+                    kml.newpoint(name="", coords=[(pose[0],pose[1],pose[2])])  # A simple Point
 
-        if 'pose' in topic_dict and topic == topic_dict['pose']:
-            
-            if 'Odometry' in msg._type:
-                data = parseGeometryMsg(msg)
-                pose = data['p']
-                kml.newpoint(name="", coords=[(pose[0],pose[1],pose[2])])  # A simple Point
+            if 'gps' in topic_dict and topic == topic_dict['gps']:
 
-        if 'gps' in topic_dict and topic == topic_dict['gps']:
-
-            lat = msg.latitude
-            lon = msg.longitude
-            alt = msg.altitude
-            kml.newpoint(name="", coords=[(lon,lat,alt)])  # A simple Point
+                lat = msg.latitude
+                lon = msg.longitude
+                alt = msg.altitude
+                kml.newpoint(name="", coords=[(lon,lat,alt)])  # A simple Point
 
     kml.savekmz(raw_gps_file, format=False)  # Saving as KMZ
     print("="*50)
@@ -132,21 +125,29 @@ def save_gps_to_kmz(bag_files,topic_dict,dst_root,dst_dir,skip=1):
 def parse_bag_name(file):
     return file.split('/')[-1].split('.')[0]
 
-def main_bag_to_file(bag_file,topic_to_read,dst_root):
-    print(bag_file)
-    # topic_to_read = list(cfg['topics'].values())
-    file = parse_bag_name(bag_file)
-   
-    save_gps_to_kmz(bag_file,topic_to_read,dst_root,file)
+def main_merge_bag_to_file(target_folder):
+    print(target_folder)
+    
+    bag_files= []
+    print("Searching for Bags: \n")
+    for bag_file in os.listdir(target_folder):
+        
+        path_bag_file = os.path.join(target_folder,bag_file)
+        if not bag_file.endswith('.bag'):
+            continue
+        print(bag_file)
+        bag_files.append(path_bag_file)
+    
+    return bag_files
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
     parser.add_argument("--bag",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/onfoot/200803/semantics_2020-08-03-14-43-08_3.bag')
-    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/onfoot/200803/')
+    parser.add_argument("--target_bag_dir",default='/Volumes/CEDRIC2TP1/on-foot')
     parser.add_argument("--pcl_topic",default='/sensors/velodyne_points')
     parser.add_argument("--pose",default='/sensors/applanix/gps_odom')
-    parser.add_argument("--dst_root",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/onfoot/200803')
+    parser.add_argument("--dst_root",default='/Users/tiagobarros/Dropbox/SHARE/DATASET/GEORGIA-FR/onfoot/')
     parser.add_argument("--gps",default='/vectornav/GPS_INS')
     args = parser.parse_args()
     # /sensors/applanix/gps_odom
@@ -156,21 +157,14 @@ if __name__ == '__main__':
     topic_to_read = {'gps':args.gps}
 
     full_path_file = []
+    
     if args.target_bag_dir != None:
         print("DIR")
-        for file in os.listdir(args.target_bag_dir):
-            path_file = os.path.join(args.target_bag_dir,file)
-            if not file.endswith('.bag'):
-                continue
-            full_path_file.append(path_file) 
-    else:
-        print("INFO")
-        print(args.bag)
-        full_path_file = [args.bag]
+        for folder in os.listdir(args.target_bag_dir):
+            target_dir = os.path.join(args.target_bag_dir,folder)
+            print("target dir:" + target_dir)
+            bag_file = main_merge_bag_to_file(target_dir)
+            target_kmz_file_name = target_dir.split('/')[-1]
+            print("dst file: " + target_kmz_file_name)
+            save_gps_to_kmz(bag_file,topic_to_read,args.dst_root,target_kmz_file_name)
 
-    for file in full_path_file:
-        print("FILES")
-        #print(file)
-        main_bag_to_file(file,topic_to_read,args.dst_root)
-
-    
