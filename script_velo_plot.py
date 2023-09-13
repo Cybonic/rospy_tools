@@ -10,9 +10,9 @@ from sklearn.neighbors import NearestNeighbors
 from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import argparse
-import loop_corr_config as config
+#import loop_corr_config as config
 from scipy.spatial import distance
-from oxford_lib.image import load_image 
+#from oxford_lib.image import load_image 
 from sklearn.neighbors import NearestNeighbors
 import cv2
 import laserscanvis 
@@ -108,6 +108,6 @@ if __name__ == "__main__":
     dataset = dataset_pointer.dataset(structures['root'],seq)
     
 
-    pclt =  laserscanvis.pointcloud(dataset)
+    pclt = laserscanvis.pointcloud(dataset)
     laser = laserscanvis.LaserScanVis(pclt)
     laser.run()

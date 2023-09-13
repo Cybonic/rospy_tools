@@ -1,2 +1,8 @@
 *.gif
 *.pyc
+*.pyo
+*.pyd
+*.png
+*.jpg
+*.jpeg
+*.txt
