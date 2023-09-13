@@ -6,7 +6,7 @@ import argparse
 import rosbag
 from tqdm import tqdm
 from utils.utils import find_bags
-from utils.msgs_utils import NavSatFixLocal,NavMsgsOdometry,pose_np_to_str, vector_to_matrix
+from utils.msgs_utils import transform_np_to_str,NavSatFixLocal,NavMsgsOdometry, vector_to_matrix
 import ros_numpy
 
 import tf as tf_ros
@@ -29,7 +29,7 @@ def get_static_tf(bag_files,static_tf, file = 'static_tf.txt', verbose = False):
                     msg.transforms[0].child_frame_id == static_tf_instance['child_frame_id']:
                     keys_tfs.remove(key)
                     
-                    # quaternion to euler
+                    # quaternion vector (x,y,z,w)
                     quaternion = [  msg.transforms[0].transform.rotation.x,
                                     msg.transforms[0].transform.rotation.y,
                                     msg.transforms[0].transform.rotation.z,
@@ -72,8 +72,17 @@ def get_static_tf(bag_files,static_tf, file = 'static_tf.txt', verbose = False):
 
 
 
-def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None):
+def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
     
+
+    topic_list = list(topic_dict.values())
+
+    # Get keys from transform dict
+    tf_key_list = []
+    if transform != None:
+        tf_key_list = list(transform.keys())
+
+
     # Create folder to save Point Clouds
     velodyne_dir =  os.path.join(dst_dir,'point_cloud')
     if not os.path.isdir(velodyne_dir):
@@ -84,22 +93,25 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None):
     velo_times_file = os.path.join(dst_dir,'point_cloud_times.txt')
 
     # Save pose
-    pose_file = os.path.join(dst_dir,'poses.txt')
+    pose_file = os.path.join(dst_dir,'gps.txt')
 
     # Save pose timestamps
-    pose_times_file = os.path.join(dst_dir,'poses_times.txt')
+    pose_times_file = os.path.join(dst_dir,'gps_times.txt')
     
     # open file descriptors
     ft  = open(pose_times_file,'w')
     fvt = open(velo_times_file,'w')
     fp  = open(pose_file,'w')
+    fp.write("utm lat lon alt\n")
 
-    topic_list = list(topic_dict.values())
+    tf_fds = {key:open(os.path.join(dst_dir,key+'.txt'),'w') for key in tf_key_list}
+    
     # Deisplay topics to read
-    print("="*50)
-    print("Topics to read:")
-    print(topic_list)
-    print("="*50)
+    if verbose:
+        print("="*50)
+        print("Topics to read:")
+        print(topic_list)
+        print("="*50)
 
     pose_counter     = 0
     velodyne_counter = 0 
@@ -111,80 +123,68 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None):
     odom_sync_sample = {'sync':0}
     
     sync = 0
-    tf_counter = 0
-    global_transform_dict = {}
-    global_transform = np.eye(4)
+    local_tf_key_list = tf_key_list.copy()
     
-
     for bag_file in tqdm(bag_files,total=len(bag_files)):
         bag = rosbag.Bag(bag_file)
-        for i,(topic, msg, t) in enumerate(bag.read_messages(topics=topic_list)):
+        
+        for topic, msg, t in tqdm(bag.read_messages(topics=topic_list)):
             #print(topic)
-            if topic == topic_dict['gps']:
-                # if 'Odometry' in msg._type:
-                #    pose = NavMsgsOdometry(msg)
-                if 'NavSatFix'  in msg._type:
-                    pose = NavSatFixLocal(msg)
-                
+            if topic == topic_dict['gps'] and  'NavSatFix'  in msg._type:
+
+                # Extract pose from NavSatFix message
+                pose = NavSatFixLocal(msg)
                 pose_sync_sample['pose'] = pose
-                pose_sync_sample['t'] = t
+                pose_sync_sample['t']    = t
                 pose_sync_sample['sync'] = 1
 
-            elif topic == topic_dict['point-cloud']:            
+            elif topic == topic_dict['point-cloud']:
+                 
+                # Extract point cloud from sensor_msgs/PointCloud2 message
                 pc_np = ros_numpy.point_cloud2.pointcloud2_to_array(msg)
-                
-                #print(pc_np.dtype)
-                pcl_sync_sample['pcl'] = pc_np
-                pcl_sync_sample['t'] = t
+                pcl_sync_sample['pcl']  = pc_np
+                pcl_sync_sample['t']    = t
                 pcl_sync_sample['sync'] = 1
-                sync +=1
                 
-            elif transform != None and topic in [topic_dict['tf'],topic_dict['tf_static']]: 
-        
+            elif len(local_tf_key_list) > 0 and topic == topic_dict['tf']: 
+                
                 for tf in msg.transforms:
-                    key_list = np.array(list(transform.keys()))
-                    # print(key_list)
-                    print(f"{tf.header.frame_id} -> {tf.child_frame_id}")
-                    for label in key_list:
-                        if tf.header.frame_id == transform[label]['frame_id'] and tf.child_frame_id == transform[label]['child_frame_id']:
-                            # convert tf to matrix
-                            translation = [tf.transform.translation.x,tf.transform.translation.y,tf.transform.translation.z]
-                            quaternion = [tf.transform.rotation.x,tf.transform.rotation.y,tf.transform.rotation.z,tf.transform.rotation.w]
-                            matrix = vector_to_matrix(translation,quaternion)
-                            global_transform_dict[label] = matrix
-                            # print(global_transform_dict[label])
-                            # print(label)
-                            # print(matrix)
-                            # print("="*50)
+                    if verbose:
+                        print(f"{tf.header.frame_id} -> {tf.child_frame_id}")
 
-                            tf_counter +=1
+                    for key, tf_instance in transform.items():
+                        
+                        if tf.header.frame_id == tf_instance['frame_id'] and \
+                            tf.child_frame_id == tf_instance['child_frame_id']:
+                            local_tf_key_list.remove(key)
+                            # convert tf to matrix
+                            # translation vector (x,y,z)
+                            translation = [tf.transform.translation.x,tf.transform.translation.y,tf.transform.translation.z]
+                            # quaternion vector (x,y,z,w)
+                            quaternion  = [tf.transform.rotation.x,tf.transform.rotation.y,tf.transform.rotation.z,tf.transform.rotation.w]
+                            # convert tf to transformation matrix
+                            matrix = vector_to_matrix(translation,quaternion)
                             
-                    if tf_counter == len(list(transform.keys())):
-                        # Compute global transform using all transforms
-                        for label in key_list:
-                            global_transform = np.dot(global_transform,global_transform_dict[label])
-                        # Save global transform
-                        odom_sync_sample['pose'] = global_transform
-                        odom_sync_sample['t'] = t
-                        odom_sync_sample['sync'] = 1
-                        # Reset Variables
-                        global_transform = np.eye(4)
-                        tf_counter = 0
-                        sync +=1
-                    
+                            odom_sync_sample[key] = {'t':t,'tf':matrix,'frame_id':tf.header.frame_id,'child_frame_id':tf.child_frame_id}
+                            
+                            odom_sync_sample['sync'] = 1
+            
             elif 'imu' in topic and topic == topic_dict['imu']:
                 from ros_numpy.geometry import quat_to_numpy
                 from tf.transformations import quaternion_matrix
                 
                 rot = quaternion_matrix(quat_to_numpy(msg.orientation))
-                
                 imy_sync_sample['sync'] = 1
                 imy_sync_sample['data'] = rot
                 imy_sync_sample['t'] = t
                 sync +=1
 
             # Check if all topics are sync                
-            if pcl_sync_sample['sync'] and odom_sync_sample['sync'] and pose_sync_sample['sync']: #and imy_sync_sample['sync']:
+            if pcl_sync_sample['sync'] and \
+                odom_sync_sample['sync'] and \
+                    pose_sync_sample['sync']: #and imy_sync_sample['sync']:
+                
+                local_tf_key_list = tf_key_list.copy()
 
                 # Save point cloud
                 scan = pcl_sync_sample['pcl'].copy()
@@ -203,26 +203,26 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None):
                 fvt.write(str(pcl_sync_sample['t']) + '\n')
                 velodyne_counter+=1
 
-                # Save Pose
-                pose_array = pose_np_to_str(pose_sync_sample['pose'],precision=3)
+                # Save GPS
+                pose_array = transform_np_to_str(pose_sync_sample['pose'],precision=3)
                 fp.write(pose_array + '\n')
                 ft.write(str(pose_sync_sample['t']) + '\n')
                 pose_counter +=1
 
-                # Save Odom
-                odom_array = pose_np_to_str(odom_sync_sample['pose'],precision=3)
-                fp.write(odom_array + '\n')
-                # save odom timestamp
-                ft.write(str(odom_sync_sample['t']) + '\n')
-                
+                # Save tfs
+                for label, fd in tf_fds.items():
+                    tf = odom_sync_sample[label]['tf']
+                    tf_array = transform_np_to_str(tf,precision=3)
+                    fd.write(tf_array + '\n')
+
                 # Reset sync
                 pose_sync_sample['sync'] = 0
-                pcl_sync_sample['sync'] = 0
-                imy_sync_sample['sync'] = 0
+                pcl_sync_sample['sync']  = 0
+                imy_sync_sample['sync']  = 0
                 odom_sync_sample['sync'] = 0
 
                 # Compute delta time
-                delta = pcl_sync_sample['t']-pose_sync_sample['t']
+                delta = pcl_sync_sample['t'] - odom_sync_sample['odom']['t']
                 delta = float(delta.secs + delta.nsecs)/1000000
                 delta_msecs_buffer.append(delta)
         bag.close()
@@ -230,11 +230,18 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None):
     ft.close()
     fp.close()
     fvt.close()
+
+    # close tf file descriptors
+    for label, fd in tf_fds.items():
+        fd.close()
+
+    if verbose:
+        print("="*50)
         
-    print("="*50)
     delta_msecs_buffer = np.array(delta_msecs_buffer)
 
-    print("time_pcl - time_pose [ms] %f %f"%(delta_msecs_buffer.mean(),delta_msecs_buffer.std()))
+    print("time_pcl - time_pose [ms] mean: %f std: %f"%(delta_msecs_buffer.mean(),delta_msecs_buffer.std()))
+    print("time_pcl - time_pose [ms] max: %f min: %f"%(delta_msecs_buffer.max(),delta_msecs_buffer.min()))
     print(f'pose: {pose_counter}  velodyne: {velodyne_counter}')
     print("="*50)
 
@@ -260,7 +267,7 @@ if __name__ == '__main__':
     
 
     topic_to_read = {'point-cloud':args.pcl_topic,
-                     'pose':args.pose_topic,
+                     'gps':args.pose_topic,
                      'tf':'/tf'
                      }
     
