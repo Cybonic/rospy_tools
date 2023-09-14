@@ -45,8 +45,11 @@ def plot_on_gif(pose: np.ndarray, dest_file:str, record_gif: bool =False, frame_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23/extracted')
+    parser.add_argument("--target",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23/extracted')
+    parser.add_argument("--file",default='odom')
     args = parser.parse_args()
+
+    target_file = args.file
 
     print("RUNNING\n")
     target = args.target
@@ -58,8 +61,8 @@ if __name__ == '__main__':
 
     files = os.listdir(target)
 
-    if 'odom.txt' in files:
-        file = os.path.join(target,'odom.txt')
+    if f'{target_file}.txt' in files:
+        file = os.path.join(target,f'{target_file}.txt')
         fd = open(file,'r')
         lines = fd.readlines()
 
@@ -75,9 +78,6 @@ if __name__ == '__main__':
     # convert to numpy array
     xyz = np.array(line_int)
 
-    gif_file  = os.path.join(target,'odom.gif')
+    gif_file  = os.path.join(target,f'{target_file}.gif')
     plot_on_gif(xyz,gif_file,record_gif=True,frame_jumps=50)
     print("Saved file to: " + gif_file)
-
-
-

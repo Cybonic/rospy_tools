@@ -1,7 +1,0 @@
-uk:
-  root: "/media/tiago/vbig/dataset/LBORO-UK"
-  dirs: ["orchard-uk/jun23","strawberry/june23"]
-  topics:
-    laser: "/velodyne_points"
-  transform:
-    pose: "odom"
