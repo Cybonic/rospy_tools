@@ -67,11 +67,6 @@ def get_static_tf(bag_files,static_tf, file = 'static_tf.txt', verbose = False):
         bag.close()
 
 
-
-
-
-
-
 def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
     
 
@@ -167,7 +162,7 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                             quaternion  = [tf.transform.rotation.x,tf.transform.rotation.y,tf.transform.rotation.z,tf.transform.rotation.w]
                             # convert tf to transformation matrix
                             matrix = vector_to_matrix(translation,quaternion)
-                            
+                        
                             odom_sync_sample[key] = {'t':t,'tf':matrix,'frame_id':tf.header.frame_id,'child_frame_id':tf.child_frame_id}
                             
                         if len(local_tf_key_list) == 0:
@@ -189,9 +184,7 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                 odom_sync_sample['sync'] and \
                     pose_sync_sample['sync']: #and imy_sync_sample['sync']:
                 
-
                 local_tf_key_list = tf_key_list.copy()
-
                 # Save point cloud
                 scan = pcl_sync_sample['pcl'].copy()
                 pc_np = np.stack((scan['x'],scan['y'],scan['z'],np.ones_like(scan['z'])),axis=1).transpose()
@@ -291,12 +284,6 @@ if __name__ == '__main__':
             'frame_id':'odom',
             'child_frame_id':'base_link'
             },
-        
-        
-        #'utm':{
-        #    'frame_id':'map',
-        #    'child_frame_id':'utm'
-        #    },
         }
     
     # read bags from folder
