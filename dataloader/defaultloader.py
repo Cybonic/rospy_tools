@@ -47,7 +47,7 @@ class loader:
         self.modality = modality
         self.target_dir = os.path.join(root,sequence)
         _,self.pclfiles= get_files(os.path.join(self.target_dir,'point_cloud'))
-        self.poses = load_pose_to_RAM(os.path.join(self.target_dir,'poses.txt'))
+        #self.poses = load_pose_to_RAM(os.path.join(self.target_dir,'odom.txt'))
     
     def __len__(self):
         return len(self.pclfiles)

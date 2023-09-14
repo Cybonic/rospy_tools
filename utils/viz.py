@@ -38,10 +38,10 @@ class myplot():
         self.ax.set_aspect('equal')
         plt.pause(self.delay)
 
-    def update_plot(self,x,y,offset=20,color=[],zoom=10,scale = []):
+    def update_plot(self,x,y,offset=20,color=np.array([]),zoom=10,scale = []):
         self.p.set_offsets(np.c_[x,y])
 
-        if color != []:
+        if color.size > 0:
             self.p.set_color(color)
 
         if scale != []:

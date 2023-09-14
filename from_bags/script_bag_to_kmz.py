@@ -77,7 +77,6 @@ def orientation2list(msg):
 def position2list(msg):
     return [msg.x,msg.y,msg.z]  
 
-
 def orientation2str(msg):
     return ' '.join([str(msg.x),str(msg.y),str(msg.z),str(msg.w)])   
 

@@ -1,7 +1,0 @@
-base_link_to_laser:
-  trans: [ 0.01848,-0.05937, 0.187] # x,y, z
-  rot: [ 1.0, 0.0, 0.0, 0.0] # msg.x, msg.y, msg.z, msg.w
-
-imu_to_laser:
-  trans: [0.01848,-0.05937, -0.113]
-  rot: [0.0,  0.0, 1.0,  0.0]

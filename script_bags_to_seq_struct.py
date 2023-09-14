@@ -134,7 +134,10 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
             if topic == topic_dict['gps'] and  'NavSatFix'  in msg._type:
 
                 # Extract pose from NavSatFix message
-                pose = NavSatFixLocal(msg)
+                lat = msg.latitude
+                lon = msg.longitude
+                alt = msg.altitude
+                pose =np.array([lon,lat,alt])
                 pose_sync_sample['pose'] = pose
                 pose_sync_sample['t']    = t
                 pose_sync_sample['sync'] = 1
@@ -215,7 +218,7 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                     tf = odom_sync_sample[label]['tf']
                     tf_array = transform_np_to_str(tf,precision=3)
                     fd.write(tf_array + '\n')
-                    fd.write(str(odom_sync_sample[label]['t']) + '\n')
+                    # fd.write(str(odom_sync_sample[label]['t']) + '\n')
 
                 # Save tfs' timestamps
                 for label, fd in tf_time_fds.items():
@@ -254,11 +257,10 @@ def main_bag_to_file(bag_file,topic_to_read,dst_root,tf):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--bag",default='/media/tiago/vbig/dataset/FU_Odometry_Dataset/rawbags/64/20170303-140708.bag')
-    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/jun23')
+    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23')
     parser.add_argument("--pcl_topic",default='/velodyne_points')
     parser.add_argument("--pose_topic",default='/antobot_gps')
-    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/jun23')
+    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23')
     parser.add_argument("--multibag",default=False)
     args = parser.parse_args()
     # /sensors/applanix/gps_odom
