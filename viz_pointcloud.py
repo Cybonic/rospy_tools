@@ -15,7 +15,7 @@ if __name__ == '__main__':
     '--root',
     type=str,
     required=False,
-    default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk',
+    default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23/extracted',
     help='Directory to get the trained model.'
   )
   parser.add_argument(
@@ -24,6 +24,13 @@ if __name__ == '__main__':
     required=False,
     default=30000,
     help='Directory to get the trained model.'
+  )
+  parser.add_argument(
+    '--kitti_format',
+    type=bool,
+    default=True,
+    required=False,
+    help='Enable point cloud format.'
   )
 
   FLAGS, unparsed = parser.parse_known_args()
@@ -40,8 +47,11 @@ if __name__ == '__main__':
   from dataloader.laserscan import Scan
   from dataloader.defaultloader import loader,velo_parser
   
-  scan = Scan(parser=velo_parser())
-  dataset = loader(FLAGS.root,"june23/extracted",scan)
+  scan = Scan()
+  if not FLAGS.kitti_format:
+    scan = Scan(parser=velo_parser())
+  
+  dataset = loader(FLAGS.root,"",scan)
   
   from dataloader.laserscanvis import LaserScanVis
 

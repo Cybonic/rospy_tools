@@ -6,7 +6,7 @@ from dataloader.projections import SphericalProjection
 from tqdm import tqdm
 
 def get_files(target_dir):
-    assert os.path.isdir(target_dir)
+    assert os.path.isdir(target_dir), "Target directory does not exit! " + target_dir
     files = np.array([f.split('.')[0] for f in os.listdir(target_dir)])
     idx = np.argsort(files)
     fullfiles = np.array([os.path.join(target_dir,f) for f in os.listdir(target_dir)])
@@ -36,8 +36,9 @@ class  velo_parser():
 
     def velo_read(self,scan_path):
         
-        scan = np.fromfile(scan_path, dtype=self.dt)
-        
+        #scan = np.fromfile(scan_path, dtype=self.dt)
+        scan = np.fromfile(scan_path)
+        #return scan.reshape(-1,4)
         return(np.stack((scan['x'],scan['y'],scan['z'],scan['intensity']),axis=1))
     
 class loader:

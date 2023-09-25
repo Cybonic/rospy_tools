@@ -4,8 +4,8 @@ bag2files.py:
 
 
 Install Dependencies:
-  - ros_numpy: pip install git+https://github.com/eric-wieser/ros_numpy
-  - pip install roslibpy   
+   ros_numpy: pip install git+https://github.com/eric-wieser/ros_numpy
+   pip install roslibpy   
    pip install --extra-index-url https://rospypi.github.io/simple/ rospy
    pip install --extra-index-url https://rospypi.github.io/simple/ tf2_ros
    pip install --extra-index-url https://rospypi.github.io/simple/ tf
