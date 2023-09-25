@@ -82,11 +82,7 @@ def transform_np_to_str(array: np.ndarray,precision = 3)-> None:
     Convert a numpy array to a string
     array: numpy array
     '''
-    # Flatten array
-    if len(array.shape) == 1:
-        array_str_list = array.flatten().tolist()
-    else:
-        array_str_list = array[:-1,:].flatten().tolist()
+    array_str_list = array.flatten().tolist()
 
     # Convert value to string   
     array_str_list = [str(round(value,precision)) for value in array_str_list]

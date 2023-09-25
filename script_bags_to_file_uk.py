@@ -76,33 +76,41 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
 
     topic_list = list(topic_dict.values())
 
+    data_list = list(topic_dict.keys())
+
     # Get keys from transform dict
     tf_key_list = []
     if transform != None:
         tf_key_list = list(transform.keys())
 
-
-    # Create folder to save Point Clouds
-    velodyne_dir =  os.path.join(dst_dir,'point_cloud')
-    if not os.path.isdir(velodyne_dir):
-        os.makedirs(velodyne_dir)
-        print("Created folder: %s"%velodyne_dir)
-
-    # Save point cloud timestamps
-    velo_times_file = os.path.join(dst_dir,'point_cloud_times.txt')
-    # Save pose
-    pose_file = os.path.join(dst_dir,'gps.txt')
-    global_tf_file = os.path.join(dst_dir,'odom.txt')
-    # Save pose timestamps
-    pose_times_file = os.path.join(dst_dir,'odom_times.txt')
+    # Create a data structure to save data from topics
+    # fied -> {data, t, sync, fd, fdt}
+    # data -> data from topic
+    # t -> timestamp
+    # sync -> flag to check if topic is sync
+    # fd -> file descriptor to save data
+    # fdt -> file descriptor to save timestamp
+    # cntr -> counter that tracks the number of data points
+    topic_tracker = {field:{'data':{},'t':[],'sync':False,'fd':[],'fdt':[],'cntr':0} for field in data_list}
     
-    # open file descriptors
-    ft  = open(pose_times_file,'w')
-    fvt = open(velo_times_file,'w')
-    fp  = open(pose_file,'w')
-
-    gtf_fd = open(global_tf_file,'w')
-    gtf_time_fd = open(global_tf_file+'_times.txt','w')
+    if 'point-cloud' in data_list:
+        # Create folder to save Point Clouds
+        velodyne_dir =  os.path.join(dst_dir,'point_cloud')
+        if not os.path.isdir(velodyne_dir):
+            os.makedirs(velodyne_dir)
+            print("Created folder: %s"%velodyne_dir)
+        # Save point cloud timestamps    
+        topic_tracker['point-cloud']['fdt'] = open(os.path.join(dst_dir,'point_cloud_timestamp.txt'),'w')
+    
+    # Save GPS data
+    if 'gps' in   data_list:
+        topic_tracker['gps']['fd'] =  open(os.path.join(dst_dir,'gps.txt'),'w')
+        topic_tracker['gps']['fdt'] = open(os.path.join(dst_dir,'gps_timestamp.txt'),'w')
+    
+    # Save Poses
+    if 'poses' in   data_list:
+        topic_tracker['poses']['fd']  = open(os.path.join(dst_dir,'poses.txt'),'w')
+        topic_tracker['poses']['fdt'] = open(os.path.join(dst_dir,'poses_timestamp.txt'),'w')
  
     # Deisplay topics to read
     if verbose:
@@ -111,16 +119,9 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
         print(topic_list)
         print("="*50)
 
-    pose_counter     = 0
-    velodyne_counter = 0 
 
-    pcl_sync_sample = {'sync':0}
-    pose_sync_sample = {'sync':0}
-    imy_sync_sample = {'sync':0}
     delta_msecs_buffer = []
-    odom_sync_sample = {'sync':0}
-    
-    sync = 0
+
     local_tf_key_list = tf_key_list.copy()
     
     for bag_file in tqdm(bag_files,total=len(bag_files)):
@@ -128,26 +129,27 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
         
         for topic, msg, t in tqdm(bag.read_messages(topics=topic_list)):
             #print(topic)
-            if topic == topic_dict['gps'] and  'NavSatFix'  in msg._type:
+            if topic in topic_list and  'NavSatFix'  in msg._type and topic == topic_dict['gps']:
 
                 # Extract pose from NavSatFix message
                 lat = msg.latitude
                 lon = msg.longitude
                 alt = msg.altitude
                 pose =np.array([lon,lat,alt])
-                pose_sync_sample['pose'] = pose
-                pose_sync_sample['t']    = t
-                pose_sync_sample['sync'] = 1
+                topic_tracker['gps']['data'] = pose
+                topic_tracker['gps']['t']    = t
+                topic_tracker['gps']['sync'] = 1
+                topic_tracker['gps']['cntr'] += 1
 
-            elif topic == topic_dict['point-cloud']:
-                 
+            elif topic in topic_list and topic == topic_dict['point-cloud']:
                 # Extract point cloud from sensor_msgs/PointCloud2 message
                 pc_np = ros_numpy.point_cloud2.pointcloud2_to_array(msg)
-                pcl_sync_sample['pcl']  = ouster_parser.velo_sensor(pc_np)
-                pcl_sync_sample['t']    = t
-                pcl_sync_sample['sync'] = 1
+                topic_tracker['point-cloud']['data']  = ouster_parser.velo_sensor(pc_np)
+                topic_tracker['point-cloud']['t']    = t
+                topic_tracker['point-cloud']['sync'] = 1
+                topic_tracker['point-cloud']['cntr'] += 1
                 
-            elif len(local_tf_key_list) > 0 and topic == topic_dict['tf']: 
+            elif len(local_tf_key_list) > 0 and topic in topic_list and topic == topic_dict['poses']: 
                 
                 for tf in msg.transforms:
                     if verbose:
@@ -157,6 +159,7 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                         
                         if tf.header.frame_id == tf_instance['frame_id'] and \
                             tf.child_frame_id == tf_instance['child_frame_id']:
+                            
                             if key in local_tf_key_list:
                                 local_tf_key_list.remove(key)
                             # convert tf to matrix
@@ -166,13 +169,15 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                             quaternion  = [tf.transform.rotation.x,tf.transform.rotation.y,tf.transform.rotation.z,tf.transform.rotation.w]
                             # convert tf to transformation matrix
                             matrix = vector_to_matrix(translation,quaternion)
-                            odom_sync_sample[key] = {'t':t,'tf':matrix,'frame_id':tf.header.frame_id,'child_frame_id':tf.child_frame_id}
+                            topic_tracker['poses']['data'][key] = {'t':t,'tf':matrix,'frame_id':tf.header.frame_id,'child_frame_id':tf.child_frame_id}
                             
                         if len(local_tf_key_list) == 0:
-                            odom_sync_sample['sync'] = 1
+                            topic_tracker['poses']['sync'] = 1
+                            topic_tracker['poses']['cntr'] += 1
+                            break
             
 
-            elif 'imu' in topic and topic == topic_dict['imu']:
+            elif 'imu' in topic and topic == topic_list:
                 from ros_numpy.geometry import quat_to_numpy
                 from tf.transformations import quaternion_matrix
                 
@@ -181,71 +186,83 @@ def extract_bag_data(bag_files,topic_dict,dst_dir,transform=None,verbose=False):
                 imy_sync_sample['data'] = rot
                 imy_sync_sample['t'] = t
                 sync +=1
-
+            
+            all_sync = np.all([value['sync'] for key,value in topic_tracker.items()])
             # Check if all topics are sync                
-            if pcl_sync_sample['sync'] and \
-                pose_sync_sample['sync']:
-                #odom_sync_sample['sync'] and \
-                    #pose_sync_sample['sync']: #and imy_sync_sample['sync']:
+            if all_sync:
                 
+                # Reset tf key list
                 if len(tf_key_list)>0:
                     local_tf_key_list = tf_key_list.copy()
 
-                # Save point cloud
-                scan = pcl_sync_sample['pcl'].copy()
-                
-                # name of point cloud file
-                name = os.path.join(velodyne_dir,'{0:07d}.bin'.format(velodyne_counter))
-                pcl = open(name,'wb')
-                scan.tofile(pcl)
-                pcl.close()
+                # Save point clouds
+                if 'point-cloud' in data_list:
+                    scan = topic_tracker['point-cloud']['data'].copy()
+                    
+                    name = os.path.join(velodyne_dir,'{0:07d}.bin'.format(topic_tracker['point-cloud']['cntr']))
+                    pcl = open(name,'wb')
+                    scan.tofile(pcl)
+                    pcl.close()
+                    
+                    timestamp = topic_tracker['point-cloud']['t'].secs + topic_tracker['point-cloud']['t'].nsecs
+                    topic_tracker['point-cloud']['fdt'].write(str(timestamp) + '\n')
+                    topic_tracker['point-cloud']['t'] = timestamp
+                    topic_tracker['point-cloud']['sync'] = 0
+                    topic_tracker['point-cloud']['data'] = {}
 
-                # Save PCL timestamp
-                fvt.write(str(pcl_sync_sample['t']) + '\n')
-                velodyne_counter+=1
-                
                 # Save GPS
-                pose_array = transform_np_to_str(pose_sync_sample['pose'],precision=3)
-                fp.write(pose_array + '\n')
-                ft.write(str(pose_sync_sample['t']) + '\n')
-                pose_counter +=1
+                if 'gps' in data_list:
+                    pose = transform_np_to_str(topic_tracker['gps']['data'].copy())
+        
+                    timestamp = topic_tracker['gps']['t'].secs + topic_tracker['gps']['t'].nsecs
+                    topic_tracker['gps']['fd'].write(pose + '\n')
+                    topic_tracker['gps']['fdt'].write(str(timestamp) + '\n')
+                    topic_tracker['gps']['t'] = timestamp
+                    topic_tracker['gps']['sync'] = 0
+                    topic_tracker['gps']['data'] = {}
+                
+                # Save Poses
+                if 'poses' in data_list:
+                    # Save Global tf
+                    tf_timestamp_list = []
+                    global_tf = np.eye(4)
+                    
+                    if len(tf_key_list)>0:
+                        # compute transformation matrix
+                        for key in local_tf_key_list:
+                            tf = topic_tracker['poses']['data'][key]['tf']
+                            global_tf = np.dot(global_tf,tf) #= np.matmul(odom_sync_sample[key]['tf'],imy_sync_sample['data'])
+                            tf_timestamp = topic_tracker['poses']['data'][key]['t']
+                            tf_timestamp_list.append(tf_timestamp.secs + tf_timestamp.nsecs)
+                        
+                        # Save timestamp
+                        pose_timestamp = np.mean(tf_timestamp_list,dtype=np.uint32)
+                        topic_tracker['poses']['t'] = pose_timestamp
+                        topic_tracker['poses']['fdt'].write(str(pose_timestamp) + '\n')
 
-                # Save Global tf
-                timestamp = []
-                global_tf = np.eye(4)
-                
-                if len(tf_key_list)>0:
-                    # compute transformation matrix
-                    for key in local_tf_key_list:
-                        global_tf = np.dot(global_tf,odom_sync_sample[key]['tf']) #= np.matmul(odom_sync_sample[key]['tf'],imy_sync_sample['data'])
-                        delta = pcl_sync_sample['t'] - odom_sync_sample[key]['t']
-                        timestamp.append(int(delta.secs + delta.nsecs))
-                    timestamp = np.mean(timestamp,dtype=np.int32)
-                
-                    # Save global transformation matrix
-                    gtf_time_fd.write(str(timestamp) + '\n')
-                    tf_array = transform_np_to_str(global_tf,precision=3)
-                    gtf_fd.write(tf_array + '\n')
-                
-                # Reset sync
-                pose_sync_sample['sync'] = 0
-                pcl_sync_sample['sync']  = 0
-                imy_sync_sample['sync']  = 0
-                odom_sync_sample['sync'] = 0
+                        # Save global transformation matrix
+                        tf_array = transform_np_to_str(global_tf,precision=3)
+                        topic_tracker['poses']['fd'].write(tf_array + '\n')
+
+                    # Reset data
+                    topic_tracker['poses']['sync'] = 0
+                    topic_tracker['poses']['data'] = {}
 
                 # Compute delta time
-                delta = pcl_sync_sample['t'] - pose_sync_sample['t']
-                delta = float(delta.secs + delta.nsecs)/1000000
+                delta = topic_tracker['point-cloud']['t'] - topic_tracker['poses']['t']
+                delta = float(delta)/1000000
                 delta_msecs_buffer.append(delta)
         bag.close()
     
-        
-    ft.close()
-    fp.close()
-    fvt.close()
-    gtf_fd.close()
-    gtf_time_fd.close()
-    return np.array(delta_msecs_buffer),pose_counter
+    
+    # Close files
+    for key,value in topic_tracker.items():
+        if value['fd'] != []:
+            value['fd'].close()
+        if value['fdt'] != []:
+            value['fdt'].close()
+
+    return np.array(delta_msecs_buffer),topic_tracker['poses']['cntr']
 
 def parse_bag_name(file):
     return file.split('/')[-1].split('.')[0]
@@ -257,17 +274,17 @@ def main_bag_to_file(bag_file,topic_to_read,dst_root,tf):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23')
+    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23')
     parser.add_argument("--pcl_topic",default='/velodyne_points')
     parser.add_argument("--pose_topic",default='/antobot_gps')
-    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/LBORO-UK/orchard-uk/june23')
+    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23')
     parser.add_argument("--multibag",default=False)
     args = parser.parse_args()
     # /sensors/applanix/gps_odom
 
     topic_to_read = {'point-cloud':args.pcl_topic,
                      'gps':args.pose_topic,
-                     'tf':'/tf'
+                     'poses':'/tf'
                      }
     
     static_tf ={
@@ -317,7 +334,7 @@ if __name__ == '__main__':
     info_fd = open(os.path.join(dst_folder,'extracted_info.txt'),'w')
     info_fd.write("GPS info structure -> utm data:  lat lon alt\n")
     info_fd.write("static tf structure -> frame_id child_frame_id x y z yaw pitch roll (radians)\n")
-    info_fd.write("tf -> transformation matrix 3x4 a11,a12,a13,a21,a22,a23,a31,a32,a33 you need add the last row [0,0,0,1]\n")
+    info_fd.write("poses -> transformation matrix 3x4 a11,a12,a13,a21,a22,a23,a31,a32,a33,0,0,0,1\n")
     
     if tfs != None:
         for label, tf in tfs.items():

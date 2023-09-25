@@ -45,39 +45,36 @@ def plot_on_gif(pose: np.ndarray, dest_file:str, record_gif: bool =False, frame_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23/extracted')
-    parser.add_argument("--file",default='odom')
+    parser.add_argument("--target_dir",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23/extracted')
+    parser.add_argument("--file",default='poses.txt')
     args = parser.parse_args()
 
-    target_file = args.file
+    target_file = os.path.join(args.target_dir,args.file)
 
+    file = args.file
     print("RUNNING\n")
-    target = args.target
-    if not os.path.isdir(target):
+    target_dir = args.target_dir
+    if not os.path.isdir(target_dir):
         print("target is not a directory")
         exit(0)
 
-    parse_target_path = target.split('/')
+  
+  
+    fd = open(target_file,'r')
+    lines = fd.readlines()
 
-    files = os.listdir(target)
-
-    if f'{target_file}.txt' in files:
-        file = os.path.join(target,f'{target_file}.txt')
-        fd = open(file,'r')
-        lines = fd.readlines()
-
-        line_int = []
-        for line in lines:
-            # map text to float transformation matrix
-            coordinates = [float(value) for value in line.strip().split(' ')]
-            coordinates = np.array(coordinates).reshape(3,4)
-            coordinates = np.append(coordinates,np.array([0,0,0,1])).reshape(4,4) # add last row
-            # get only translation
-            line_int.append(coordinates[:3,3])
+    line_int = []
+    for line in lines:
+        # map text to float transformation matrix
+        coordinates = [float(value) for value in line.strip().split(' ')]
+        coordinates = np.array(coordinates).reshape(4,4)
+        # get only translation
+        line_int.append(coordinates[:3,3])
 
     # convert to numpy array
     xyz = np.array(line_int)
 
-    gif_file  = os.path.join(target,f'{target_file}.gif')
+    name = file.split('.')[0]
+    gif_file  = os.path.join(args.target_dir,f'{name}.gif')
     plot_on_gif(xyz,gif_file,record_gif=True,frame_jumps=50)
     print("Saved file to: " + gif_file)

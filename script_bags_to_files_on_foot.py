@@ -266,7 +266,7 @@ if __name__ == '__main__':
 
     topic_to_read = {'point-cloud':args.pcl_topic,
                      'gps':args.pose_topic,
-                     'tf':'/tf'
+                     'poses':'/tf'
                      }
     
     static_tf ={
