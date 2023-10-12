@@ -257,17 +257,19 @@ def main_bag_to_file(bag_file,topic_to_read,dst_root,tf):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/GreenHouse/e4')
+    parser.add_argument("--target_bag_dir",default='/media/tiago/vbig/dataset/GreenHouse/e5')
     parser.add_argument("--pcl_topic",default='/ouster/points')
     parser.add_argument("--pose_topic",default='/fix')
-    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/GreenHouse/e4')
+    parser.add_argument("--imu_topic",default='/imu/data')
+    parser.add_argument("--dst_root",default='/media/tiago/vbig/dataset/GreenHouse/e5')
     parser.add_argument("--multibag",default=False)
     args = parser.parse_args()
     # /sensors/applanix/gps_odom
 
     topic_to_read = {'point-cloud':args.pcl_topic,
                      'gps':args.pose_topic,
-                     'tf':'/tf'
+                     'tf':'/tf',
+                     'imu': args.imu_topic
                      }
     
     static_tf ={
@@ -279,6 +281,7 @@ if __name__ == '__main__':
             'frame_id':'base_link',
             'child_frame_id':'navsat_link'
             }
+        #'imu':{
         }
     
     tfs = None

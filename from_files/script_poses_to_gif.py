@@ -45,7 +45,8 @@ def plot_on_gif(pose: np.ndarray, dest_file:str, record_gif: bool =False, frame_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_dir",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23/extracted')
+    #parser.add_argument("--target_dir",default='/media/tiago/vbig/dataset/LBORO-UK/strawberry/june23/extracted')
+    parser.add_argument("--target_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/june23/extracted')
     parser.add_argument("--file",default='poses.txt')
     args = parser.parse_args()
 
