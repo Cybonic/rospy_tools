@@ -303,7 +303,7 @@ def parse_bag_name(file):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/aut22')
+    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/june23')
     parser.add_argument("--pcl_topic",default='/husky/velodyne_points')
     parser.add_argument("--pose_topic",default='/odom')
     parser.add_argument("--gps_topic",default='/mavros/global_position/raw/fix')
