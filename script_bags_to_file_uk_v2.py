@@ -382,10 +382,8 @@ def timestamp_match(query,reference,verbose=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/strawberry/june23')
-    parser.add_argument("--pcl_topic",default='/husky/velodyne_points')
-    parser.add_argument("--pose_topic",default='/odom')
-    parser.add_argument("--gps_topic",default='/mavros/global_position/raw/fix')
+    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/sum22')
+    parser.add_argument("--sync",default=False)
     parser.add_argument("--dst_root",default=None)
     parser.add_argument("--multibag",default=False)
     parser.add_argument("--from_file",default="topics2read.yaml")
@@ -487,29 +485,32 @@ if __name__ == '__main__':
     save_pcd_KITTI_format(pcd_data,pcd_timesamp,target_dir)
 
     if data_extracted['poses']:
-        print("\Sync POSES data with point cloud...")
-        nearest_indices = timestamp_match(pcd_timesamp,poses_timestamp)
+        if args.sync:
+            print("\Sync POSES data with point cloud...")
+            nearest_indices = timestamp_match(pcd_timesamp,poses_timestamp)
 
-        poses = poses[nearest_indices]
-        poses_timestamp = poses_timestamp[nearest_indices]
+            poses = poses[nearest_indices]
+            poses_timestamp = poses_timestamp[nearest_indices]
 
         save_poses_KITTI_format(poses,poses_timestamp,target_dir)
 
     if 'gps' in list(data_extracted.keys()) and data_extracted['gps']:
-        print("\Sync GPS data with point cloud...")
-        nearest_indices = timestamp_match(pcd_timesamp,gps_timestamp)
+        if args.sync:
+            print("\Sync GPS data with point cloud...")
+            nearest_indices = timestamp_match(pcd_timesamp,gps_timestamp)
 
-        gps_data      = gps_data[nearest_indices]
-        gps_timestamp = gps_timestamp[nearest_indices]
+            gps_data      = gps_data[nearest_indices]
+            gps_timestamp = gps_timestamp[nearest_indices]
 
         save_gps_KITTI_format(gps_data,gps_timestamp,target_dir)
 
     if 'imu' in list(data_extracted.keys()) and data_extracted['imu']:
-        print("\Sync IMU data with point cloud...")
-        nearest_indices = timestamp_match(pcd_timesamp,imu_timestamp)
+        if args.sync:
+            print("\Sync IMU data with point cloud...")
+            nearest_indices = timestamp_match(pcd_timesamp,imu_timestamp)
 
-        imu_data      = imu_data[nearest_indices]
-        imu_timestamp = imu_timestamp[nearest_indices]
+            imu_data      = imu_data[nearest_indices]
+            imu_timestamp = imu_timestamp[nearest_indices]
 
         save_imu_KITTI_format(imu_data,imu_timestamp,target_dir)
 
