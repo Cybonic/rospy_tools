@@ -11,7 +11,7 @@ from utils.velo_utils import parser,OUSTER_16_STRUCTURE
 import ros_numpy
 from ros_numpy.geometry import quat_to_numpy
 from tf.transformations import quaternion_matrix
-
+import utm
 import tf as tf_ros
 
 
@@ -139,7 +139,6 @@ def extract_IMU_from_topic(bag_files,topic_dict):
     return np.array(array,dtype=np.float64),np.array(timestamp_array)
 
 
-
 def extract_data_from_tfs(bags,transform,save_dir,verbose=True):
     
     for key, value in transform.items():
@@ -162,7 +161,21 @@ def extract_data_from_tfs(bags,transform,save_dir,verbose=True):
         fdt.close()
 
 
-def save_gps_KITTI_format(data,timestamp,save_dir):
+def conv_gps_to_positions_KITTI_format(data:np.ndarray):
+    # Convert lat lon alt to utm
+    pose_array = data.copy()
+    utm_pose = utm.from_latlon(data[:,1],data[:,0])
+    pose_array[:,0] = utm_pose[0]
+    pose_array[:,1] = utm_pose[1]
+    # Center reference frame at the first gps position
+ 
+    first_pose = pose_array[0,:]
+    pose_array = pose_array - first_pose
+
+    return pose_array
+
+
+def save_positions_KITTI_format(data,timestamp,save_dir):
     """
     Save poses using the KITTI format
     
@@ -173,18 +186,45 @@ def save_gps_KITTI_format(data,timestamp,save_dir):
         
     """
     # Save data to files using the KITTI format
-    fd =  open(os.path.join(save_dir,f'gps.txt'),'w')
-    fdt = open(os.path.join(save_dir,f'gps_timestamp.txt'),'w')
-    
+    fd =  open(os.path.join(save_dir,f'positions.txt'),'w')
+    fdt = open(os.path.join(save_dir,f'positions_timestamp.txt'),'w')
+
+
     for i in range(len(data)):
         array_str_list = ' '.join([str(value) for value in data[i]])
         fd.write(array_str_list + '\n')
         fdt.write(str(timestamp[i]) + '\n')
     
-    print(f"\nSaved {len(data)} GPS to file at {save_dir}")
+    print(f"\nSaved {len(data)} POSITIONS to file at {save_dir}")
 
     fd.close()
     fdt.close()
+
+
+def save_gps_KITTI_format(data,timestamp,save_dir):
+    """
+    Save poses using the KITTI format
+    
+    Args:
+        data (np.array): poses data
+        timestamp (np.array): timestamp of each pose
+        save_dir (str): directory to save the data
+        
+    """
+    
+    rfd =  open(os.path.join(save_dir,f'gps.txt'),'w')
+    rdt = open(os.path.join(save_dir,f'gps_timestamp.txt'),'w')
+
+    for i in range(len(data)):        
+        array_str_list = ' '.join([str(value) for value in data[i]])
+        rfd.write(array_str_list + '\n')
+        rdt.write(str(timestamp[i]) + '\n')
+    
+    print(f"\nSaved {len(data)} GPS to file at {save_dir}")
+
+    rfd.close()
+    rdt.close()
+
 
 
 def save_poses_KITTI_format(data,timestamp,save_dir):
@@ -274,7 +314,9 @@ def extract_from_tf(bag_files,transform,verbose=True):
     time_buffer = []
     
     timestamp = []
-    local_tf = {} 
+    local_tf = {key:[] for key in tf_list} 
+
+    timestamp = {key:[] for key in tf_list}
     for bag_file in tqdm(bag_files,total=len(bag_files)):
         bag = rosbag.Bag(bag_file)
         
@@ -283,6 +325,7 @@ def extract_from_tf(bag_files,transform,verbose=True):
             for tf in msg.transforms:
                 if verbose:
                     print(f"\n{tf.header.frame_id} -> {tf.child_frame_id}\n")
+                global_tf = np.eye(4)
 
                 for key, tf_instance in transform.items():
                     
@@ -292,8 +335,8 @@ def extract_from_tf(bag_files,transform,verbose=True):
                         if verbose:
                             print(f"---> stored")
 
-                        if key in local_tf_list:
-                            local_tf_list.remove(key)
+                        #if key in local_tf_list:
+                        #    local_tf_list.remove(key)
                         # convert tf to matrix
                         # translation vector (x,y,z)
                         translation = [tf.transform.translation.x,tf.transform.translation.y,tf.transform.translation.z]
@@ -301,28 +344,9 @@ def extract_from_tf(bag_files,transform,verbose=True):
                         quaternion  = [tf.transform.rotation.x,tf.transform.rotation.y,tf.transform.rotation.z,tf.transform.rotation.w]
                         # convert tf to transformation matrix
                         matrix = vector_to_matrix(translation,quaternion)
-                        local_tf[key] = matrix # Storing tf using respective key (here order is not important) 
-                        timestamp.append(t.secs + float(t.nsecs)/1e9)
-
-                        if len(local_tf_list) == 0:
-                            # All tfs were found
-                            break
-
-            # Check if all tfs were found
-            if len(local_tf_list) == 0:
-                # compute transformation matrix
-                # compute the global tf using the order provided in TF_LIST
-                global_tf = np.eye(4)
-                for key in tf_list:
-                    global_tf = np.dot(global_tf,local_tf[key] )
-                # Save global transformation matrix
-                data_buffer.append(global_tf)
-                # Save timestamp, mean of all timestamps
-                time_buffer.append(np.mean(timestamp))
-                # Reset buffers
-                local_tf_list = tf_list.copy()
-                timestamp = []
-                local_tf = {} 
+                        data_buffer.append(matrix) # Storing tf using respective key (here order is not important) 
+                        time_buffer.append(t.secs + float(t.nsecs)/1e9) # Storing tf using respective key (here order is not important) 
+ 
                 
     return np.array(data_buffer),np.array(time_buffer)
 
@@ -382,10 +406,9 @@ def timestamp_match(query,reference,verbose=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/sum22')
-    parser.add_argument("--sync",default=False)
+    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/aut22')
+    parser.add_argument("--sync",default=True)
     parser.add_argument("--dst_root",default=None)
-    parser.add_argument("--multibag",default=False)
     parser.add_argument("--from_file",default="topics2read.yaml")
 
     args = parser.parse_args()
@@ -461,7 +484,7 @@ if __name__ == '__main__':
         data_extracted['poses'] = True
     
     elif tfs != None and 'poses' in tfs:
-        print(f"\nExtracting POSES from bag files...")
+        print(f"\nExtracting POSES from tfs...")
         poses,poses_timestamp = extract_from_tf(bags,tfs['poses'],verbose=False)
         print("Extracted %d data points"%len(poses))
         data_extracted['poses'] = True
@@ -482,6 +505,8 @@ if __name__ == '__main__':
     # Data Association
     # Save sync data to files using the KITTI format
     # =====================
+
+    
     save_pcd_KITTI_format(pcd_data,pcd_timesamp,target_dir)
 
     if data_extracted['poses']:
@@ -495,6 +520,7 @@ if __name__ == '__main__':
         save_poses_KITTI_format(poses,poses_timestamp,target_dir)
 
     if 'gps' in list(data_extracted.keys()) and data_extracted['gps']:
+        
         if args.sync:
             print("\Sync GPS data with point cloud...")
             nearest_indices = timestamp_match(pcd_timesamp,gps_timestamp)
@@ -514,7 +540,11 @@ if __name__ == '__main__':
 
         save_imu_KITTI_format(imu_data,imu_timestamp,target_dir)
 
+    positions_data = conv_gps_to_positions_KITTI_format(gps_data)
+    position_timesamp = gps_timestamp
 
+    # Save positions in KITTI format
+    save_positions_KITTI_format(positions_data,position_timesamp,target_dir)
 
     info_fd = open(os.path.join(target_dir,'extracted_info.txt'),'w')
     info_fd.write("GPS info structure -> utm data:  lat lon alt\n")
