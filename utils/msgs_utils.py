@@ -77,7 +77,7 @@ def orientation2str(msg):
 def position2str(msg):
     return ' '.join([str(msg.x),str(msg.y),str(msg.z)]) 
 
-def transform_np_to_str(array: np.ndarray,precision = None)-> None:
+def transform_np_to_str(array: np.ndarray,precision = 3)-> None:
     '''
     Convert a numpy array to a string
     array: numpy array

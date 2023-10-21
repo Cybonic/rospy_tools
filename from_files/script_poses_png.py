@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
     parser.add_argument("--target_dir",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/husky/temp')
-    parser.add_argument("--file", default="poses_husky.txt")
+    parser.add_argument("--file", default="poses_gps.txt")
     parser.add_argument("--kitti_format",default=True,type=bool,help="Expects that poses.txt file to be kitti format")
     args = parser.parse_args()
 

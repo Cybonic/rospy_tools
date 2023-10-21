@@ -508,7 +508,7 @@ if __name__ == '__main__':
                         'gps':['gps'],
                         'imu':['imu']}
     
-    modality_extract_fn     = {'pcd':extract_point_cloud_from_topic,
+    modality_extract_fn  = {'pcd':extract_point_cloud_from_topic,
                         'poses':extract_poses_from_topic,
                         'gps':extract_gps_from_topic,
                         'imu':extract_IMU_from_topic}
