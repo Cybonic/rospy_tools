@@ -139,6 +139,21 @@ def extract_IMU_from_topic(bag_files,topic_dict):
     return np.array(array,dtype=np.float64),np.array(timestamp_array)
 
 
+def extract_ODOM_from_topic(bag_files,topic_dict):
+    array = []
+    timestamp_array = []
+    topic_list = [topic_dict]
+    for bag_file in tqdm(bag_files,total=len(bag_files)):
+        bag = rosbag.Bag(bag_file)
+        
+        for topic, msg, t in tqdm(bag.read_messages(topics=topic_list)):
+        
+            rot = quaternion_matrix(quat_to_numpy(msg.orientation))
+            array.append(rot)
+            timestamp = t.secs + float(t.nsecs)/1e9
+            timestamp_array.append(timestamp)
+
+
 def extract_data_from_tfs(bags,transform,save_dir,verbose=True):
     
     for key, value in transform.items():
@@ -407,7 +422,8 @@ def timestamp_match(query,reference,verbose=True):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
     parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/husky')
-    parser.add_argument("--sync",default=True)
+    parser.add_argument("--sync",default=False)
+    parser.add_argument("--gps_to_position",default=False)
     parser.add_argument("--dst_root",default=None)
     parser.add_argument("--from_file",default="topics2read.yaml")
 
@@ -468,7 +484,7 @@ if __name__ == '__main__':
     # Extract data from bags
     # =====================
 
-    data_extracted = {'poses':False,'gps':False,'point-cloud':False}
+    data_extracted = {'pcd':False, 'poses':False,'gps':False,'point-cloud':False}
 
     print("Extracting Topics from bags...\n")
     # Extract point cloud from topic
@@ -478,7 +494,7 @@ if __name__ == '__main__':
         print("Extracted %d data points"%len(pcd_data))
         data_extracted['point-cloud'] = True
 
-    if 'poses' in topic_to_read:
+    if 'poses' in topic_to_read or 'odom' in topic_to_read:
         # Extract poses from topic
         print("\nExtracting POSES from topic...\n")
         poses,poses_timestamp = extract_poses_from_topic(bags,topic_to_read['poses'])
@@ -503,17 +519,18 @@ if __name__ == '__main__':
         print("Extracted %d data points"%len(imu_data))
         data_extracted['imu'] = True
 
+
     # =====================
     # Data Association
     # Save sync data to files using the KITTI format
     # =====================
 
-    
-    save_pcd_KITTI_format(pcd_data,pcd_timesamp,target_dir)
+    if'pcd' in list(data_extracted.keys()) and  data_extracted['pcd']:
+        save_pcd_KITTI_format(pcd_data,pcd_timesamp,target_dir)
 
     if data_extracted['poses']:
         if args.sync:
-            print("\Sync POSES data with point cloud...")
+            print("\nSync POSES data with point cloud...")
             nearest_indices = timestamp_match(pcd_timesamp,poses_timestamp)
 
             poses = poses[nearest_indices]
@@ -524,7 +541,7 @@ if __name__ == '__main__':
     if 'gps' in list(data_extracted.keys()) and data_extracted['gps']:
         
         if args.sync:
-            print("\Sync GPS data with point cloud...")
+            print("\nSync GPS data with point cloud...")
             nearest_indices = timestamp_match(pcd_timesamp,gps_timestamp)
 
             gps_data      = gps_data[nearest_indices]
@@ -534,22 +551,26 @@ if __name__ == '__main__':
 
     if 'imu' in list(data_extracted.keys()) and data_extracted['imu']:
         if args.sync:
-            print("\Sync IMU data with point cloud...")
+            print("\nSync IMU data with point cloud...")
             nearest_indices = timestamp_match(pcd_timesamp,imu_timestamp)
 
             imu_data      = imu_data[nearest_indices]
             imu_timestamp = imu_timestamp[nearest_indices]
 
         save_imu_KITTI_format(imu_data,imu_timestamp,target_dir)
+    
 
-    positions_data = conv_gps_to_positions_KITTI_format(gps_data)
-    position_timesamp = gps_timestamp
+    if args.gps_to_position:
+        print("\nConverting GPS to positions...\n")
+        positions_data = conv_gps_to_positions_KITTI_format(gps_data)
+        position_timesamp = gps_timestamp
 
-    # Save positions in KITTI format
-    save_positions_KITTI_format(positions_data,position_timesamp,target_dir)
+        # Save positions in KITTI format
+        save_positions_KITTI_format(positions_data,position_timesamp,target_dir)
 
     info_fd = open(os.path.join(target_dir,'extracted_info.txt'),'w')
     info_fd.write("GPS info structure -> utm data:  lat lon alt\n")
+    info_fd.write(f"Synchonized Data (to point cloud): {args.sync}\n")
     info_fd.write("static tf structure -> frame_id child_frame_id x y z yaw pitch roll (radians)\n")
     info_fd.write("poses -> transformation matrix 4x4 a11,a12,a13,a21,a22,a23,a31,a32,a33,0,0,0,1\n")
     info_fd.close()
