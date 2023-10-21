@@ -519,20 +519,19 @@ if __name__ == '__main__':
                         'gps':save_gps_KITTI_format,
                         'imu':save_imu_KITTI_format}        
 
+    modalities =['pcd','poses','gps','imu']
+
     field_names = list(topic_to_read.keys())
     topic_names = list(topic_to_read.values())
-    modalities =['pcd','poses','gps','imu']
-    data_extracted = {mod:[] for mod in modalities}#'pcd':False, 'poses':False,'gps':False,'point-cloud':False}
+    
+    data_extracted = {mod:[] for mod in modalities}
 
     print("Extracting Topics from bags...\n")
     # Extract point cloud from topic
-    #check = np.array([[True,i]  for i,(field) in enumerate(field_names) if [str(field).startswith(token) for token in pcd_tokens['tokens'] ].count(True) > 0])
-    modality = 'pcd'
-
-
     for modality in ['pcd','poses','gps','imu']:
         fn = modality_extract_fn[modality]
         tokens = modality_token[modality]
+
         print(f"Extracting {modality} from bag files...")
         print(f"Tokens: {tokens}")
 
@@ -543,8 +542,6 @@ if __name__ == '__main__':
             data_extracted[modality].append({'data':data,'timestamp':timestamp,'field':field_names[idx]})
             print("Extracted %d data points from %s"%(len(data),topic_names[idx]))
 
-
-
     # =====================
     # Data Association
     # Save sync data to files using the KITTI format
@@ -553,6 +550,7 @@ if __name__ == '__main__':
     modality = 'pcd'
     save_fn = modality_save_fn[modality]
     mod_data = data_extracted[modality]
+
     for values in mod_data:
 
         data = values['data']
@@ -580,8 +578,6 @@ if __name__ == '__main__':
                 nearest_indices = timestamp_match(ref_timestamp,timestamp)
                 data = data[nearest_indices]
                 timestamp = timestamp[nearest_indices]
-
-            
             # save file
             save_fn(data,timestamp,target_file)
             print(f"\nSaved {len(data)} {modality} to {target_file} ... ")
