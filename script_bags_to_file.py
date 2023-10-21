@@ -216,7 +216,7 @@ def save_positions_KITTI_format(data,timestamp,save_dir):
     fdt.close()
 
 
-def save_gps_KITTI_format(data,timestamp,save_dir):
+def save_gps_KITTI_format(data,timestamp,file):
     """
     Save poses using the KITTI format
     
@@ -227,46 +227,21 @@ def save_gps_KITTI_format(data,timestamp,save_dir):
         
     """
     
-    rfd =  open(os.path.join(save_dir,f'gps.txt'),'w')
-    rdt = open(os.path.join(save_dir,f'gps_timestamp.txt'),'w')
+    # Save data to files using the KITTI format
+    fd =  open(file + '.txt','w')
+    fdt = open(file + '_timestamp.txt','w')
 
     for i in range(len(data)):        
         array_str_list = ' '.join([str(value) for value in data[i]])
-        rfd.write(array_str_list + '\n')
-        rdt.write(str(timestamp[i]) + '\n')
-    
-    print(f"\nSaved {len(data)} GPS to file at {save_dir}")
-
-    rfd.close()
-    rdt.close()
-
-
-
-def save_poses_KITTI_format(data,timestamp,save_dir):
-    """
-    Save poses using the KITTI format
-    
-    Args:
-        data (np.array): poses data
-        timestamp (np.array): timestamp of each pose
-        save_dir (str): directory to save the data
-        
-    """
-    # Save data to files using the KITTI format
-    fd =  open(os.path.join(save_dir,f'poses.txt'),'w')
-    fdt = open(os.path.join(save_dir,f'poses_timestamp.txt'),'w')
-    
-    for i in range(len(data)):
-        fd.write(transform_np_to_str(data[i]) + '\n')
+        fd.write(array_str_list + '\n')
         fdt.write(str(timestamp[i]) + '\n')
-    
-    print(f"\nSaved {len(data)} POSES to file at {save_dir}")
 
     fd.close()
     fdt.close()
 
 
-def save_imu_KITTI_format(data,timestamp,save_dir):
+
+def save_poses_KITTI_format(data,timestamp,file):
     """
     Save poses using the KITTI format
     
@@ -277,14 +252,36 @@ def save_imu_KITTI_format(data,timestamp,save_dir):
         
     """
     # Save data to files using the KITTI format
-    fd =  open(os.path.join(save_dir,f'imu.txt'),'w')
-    fdt = open(os.path.join(save_dir,f'imu_timestamp.txt'),'w')
+    fd =  open(file + '.txt','w')
+    fdt = open(file + '_timestamp.txt','w')
+    
+    for i in range(len(data)):
+        fd.write(transform_np_to_str(data[i]) + '\n')
+        fdt.write(str(timestamp[i]) + '\n')
+
+    fd.close()
+    fdt.close()
+
+
+def save_imu_KITTI_format(data,timestamp,file):
+    """
+    Save poses using the KITTI format
+    
+    Args:
+        data (np.array): poses data
+        timestamp (np.array): timestamp of each pose
+        save_dir (str): directory to save the data
+        
+    """
+    # Save data to files using the KITTI format
+    fd =  open(file +'.txt','w')
+    fdt = open(file + 'timestamp.txt','w')
     
     for i in range(len(data)):
         fd.write(transform_np_to_str(data[i]) + '\n')
         fdt.write(str(timestamp[i]) + '\n')
     
-    print(f"\nSaved {len(data)} IMU to file at {save_dir}")
+    print(f"\nSaved {len(data)}  to {file}")
 
     fd.close()
     fdt.close()
@@ -302,9 +299,9 @@ def save_pcd_KITTI_format(data,timestamp,save_dir):
     
     """
 
-    pcd_dir =  os.path.join(save_dir,"point_cloud")
+    pcd_dir =  save_dir
     os.makedirs(pcd_dir,exist_ok=True)
-    fdt = open(os.path.join(save_dir,'point_cloud_timestamp.txt'),'w')
+    fdt = open(save_dir +'timestamp.txt','w')
 
     for i in range(len(data)):
         name = os.path.join(pcd_dir,'{0:07d}.bin'.format(i))
@@ -419,6 +416,21 @@ def timestamp_match(query,reference,verbose=True):
 
     return nearest_indices
 
+
+def check_for_tokens_in_topics(field_names,tokens):
+
+    indice = []
+    for i,(field) in enumerate(field_names):
+        for token in tokens:
+            if str(field).startswith(token):
+                indice.append(i)
+            
+            
+    return np.array(indice)
+    
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
     parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/husky')
@@ -456,6 +468,7 @@ if __name__ == '__main__':
                 tfs = data['tf']
 
     
+    
     # read bags from folder
     bags = []
 
@@ -464,109 +477,115 @@ if __name__ == '__main__':
         if elem.endswith('.bag'):
             bags.append(os.path.join(bag_dir,elem))
     
+    # Sort bags by name
     bags = sorted(bags)
 
     dest_dir = args.dst_root
     # Create folder to save data
-
     target_dir = os.path.join(dest_dir,'temp')
     os.makedirs(target_dir,exist_ok=True)
 
     # Read static tf
-    
     if len(static_tf.keys()) > 0:
         print("Reading static tf...\n")
         file = os.path.join(target_dir,'static_tf.txt')
         get_static_tf(bags,static_tf=static_tf,file=file,verbose=True)
 
 
+    # Read tf
+    if tfs != None:
+        print(f"\nExtracting POSES from tfs...")
+        poses,poses_timestamp = extract_from_tf(bags,tfs['poses'],verbose=False)
+        print("Extracted %d data points"%len(poses))
+        #data_extracted['poses'] = True
+    
     # =====================
     # Extract data from bags
     # =====================
 
-    data_extracted = {'pcd':False, 'poses':False,'gps':False,'point-cloud':False}
+    modality_token   = {'pcd':['point-cloud','point_cloud','velodyne_points'],
+                        'poses':['poses','odom'],
+                        'gps':['gps'],
+                        'imu':['imu']}
+    
+    modality_extract_fn     = {'pcd':extract_point_cloud_from_topic,
+                        'poses':extract_poses_from_topic,
+                        'gps':extract_gps_from_topic,
+                        'imu':extract_IMU_from_topic}
+    
+
+    modality_save_fn     = {'pcd':save_pcd_KITTI_format,
+                        'poses':save_poses_KITTI_format,
+                        'gps':save_gps_KITTI_format,
+                        'imu':save_imu_KITTI_format}        
+
+    field_names = list(topic_to_read.keys())
+    topic_names = list(topic_to_read.values())
+    modalities =['pcd','poses','gps','imu']
+    data_extracted = {mod:[] for mod in modalities}#'pcd':False, 'poses':False,'gps':False,'point-cloud':False}
 
     print("Extracting Topics from bags...\n")
     # Extract point cloud from topic
-    if 'point-cloud' in topic_to_read:
-        print(f"\nExtracting POINT CLOUD from bag files...")
-        pcd_data,pcd_timesamp = extract_point_cloud_from_topic(bags,topic_to_read['point-cloud'],verbose=False)        
-        print("Extracted %d data points"%len(pcd_data))
-        data_extracted['point-cloud'] = True
+    #check = np.array([[True,i]  for i,(field) in enumerate(field_names) if [str(field).startswith(token) for token in pcd_tokens['tokens'] ].count(True) > 0])
+    modality = 'pcd'
 
-    if 'poses' in topic_to_read or 'odom' in topic_to_read:
-        # Extract poses from topic
-        print("\nExtracting POSES from topic...\n")
-        poses,poses_timestamp = extract_poses_from_topic(bags,topic_to_read['poses'])
-        print("Extracted %d data points"%len(poses))
-        data_extracted['poses'] = True
-    
-    elif tfs != None and 'poses' in tfs:
-        print(f"\nExtracting POSES from tfs...")
-        poses,poses_timestamp = extract_from_tf(bags,tfs['poses'],verbose=False)
-        print("Extracted %d data points"%len(poses))
-        data_extracted['poses'] = True
 
-    if 'gps' in topic_to_read:
-        print("\nExtracting GPS from topic...\n")
-        gps_data,gps_timestamp = extract_gps_from_topic(bags,topic_to_read['gps'])
-        print("Extracted %d data points"%len(gps_data))
-        data_extracted['gps'] = True
-    
-    if 'imu' in topic_to_read:
-        print("\nExtracting IMU from topic...\n")
-        imu_data,imu_timestamp = extract_IMU_from_topic(bags,topic_to_read['imu'])
-        print("Extracted %d data points"%len(imu_data))
-        data_extracted['imu'] = True
+    for modality in ['pcd','poses','gps','imu']:
+        fn = modality_extract_fn[modality]
+        tokens = modality_token[modality]
+        print(f"Extracting {modality} from bag files...")
+        print(f"Tokens: {tokens}")
+
+        check = check_for_tokens_in_topics(field_names, tokens)
+        for idx in check:
+            print(f"\nExtracting {field_names[idx]} from bag files...")
+            data,timestamp = fn(bags,topic_to_read[field_names[idx]])        
+            data_extracted[modality].append({'data':data,'timestamp':timestamp,'field':field_names[idx]})
+            print("Extracted %d data points from %s"%(len(data),topic_names[idx]))
+
 
 
     # =====================
     # Data Association
     # Save sync data to files using the KITTI format
     # =====================
+    ref_timestamp = None
+    modality = 'pcd'
+    save_fn = modality_save_fn[modality]
+    mod_data = data_extracted[modality]
+    for values in mod_data:
 
-    if'pcd' in list(data_extracted.keys()) and  data_extracted['pcd']:
-        save_pcd_KITTI_format(pcd_data,pcd_timesamp,target_dir)
+        data = values['data']
+        timestamp = values['timestamp']
+        fieldname = values['field']
+        target_file = os.path.join(target_dir,fieldname)
+        ref_timestamp = timestamp.copy()
+        save_fn(data,timestamp,target_file)
+        del data_extracted[modality]
 
-    if data_extracted['poses']:
-        if args.sync:
-            print("\nSync POSES data with point cloud...")
-            nearest_indices = timestamp_match(pcd_timesamp,poses_timestamp)
+    # =====================
+    for modality, mod_data in data_extracted.items():
+        save_fn = modality_save_fn[modality]
 
-            poses = poses[nearest_indices]
-            poses_timestamp = poses_timestamp[nearest_indices]
+        if len(mod_data) == 0:
+            continue
 
-        save_poses_KITTI_format(poses,poses_timestamp,target_dir)
+        for values in mod_data:
+            data = values['data']
+            timestamp = values['timestamp']
+            fieldname = values['field']
+            target_file = os.path.join(target_dir,fieldname)
+            if args.sync:
+                print("\nSync {modality} data with point cloud...")
+                nearest_indices = timestamp_match(ref_timestamp,timestamp)
+                data = data[nearest_indices]
+                timestamp = timestamp[nearest_indices]
 
-    if 'gps' in list(data_extracted.keys()) and data_extracted['gps']:
-        
-        if args.sync:
-            print("\nSync GPS data with point cloud...")
-            nearest_indices = timestamp_match(pcd_timesamp,gps_timestamp)
+            
+            # save file
+            save_fn(data,timestamp,target_file)
+            print(f"\nSaved {len(data)} {modality} to {target_file} ... ")
 
-            gps_data      = gps_data[nearest_indices]
-            gps_timestamp = gps_timestamp[nearest_indices]
-
-        save_gps_KITTI_format(gps_data,gps_timestamp,target_dir)
-
-    if 'imu' in list(data_extracted.keys()) and data_extracted['imu']:
-        if args.sync:
-            print("\nSync IMU data with point cloud...")
-            nearest_indices = timestamp_match(pcd_timesamp,imu_timestamp)
-
-            imu_data      = imu_data[nearest_indices]
-            imu_timestamp = imu_timestamp[nearest_indices]
-
-        save_imu_KITTI_format(imu_data,imu_timestamp,target_dir)
-    
-
-    if args.gps_to_position:
-        print("\nConverting GPS to positions...\n")
-        positions_data = conv_gps_to_positions_KITTI_format(gps_data)
-        position_timesamp = gps_timestamp
-
-        # Save positions in KITTI format
-        save_positions_KITTI_format(positions_data,position_timesamp,target_dir)
 
     info_fd = open(os.path.join(target_dir,'extracted_info.txt'),'w')
     info_fd.write("GPS info structure -> utm data:  lat lon alt\n")

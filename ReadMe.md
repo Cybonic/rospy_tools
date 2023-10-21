@@ -11,4 +11,5 @@ Install Dependencies:
    pip install --extra-index-url https://rospypi.github.io/simple/ tf
 
 # TO-DOß
-    [] Make a version that loads a set of bags and safes their data as it was one
+    [] before extraction, verify if the ros message type matches the extraction approach;
+    [] from the topic2file.yaml file, use the keys as generic file/dir name, add an additional verification approach to select the right extraction approach 
