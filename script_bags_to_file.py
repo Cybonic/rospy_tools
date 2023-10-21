@@ -406,7 +406,7 @@ def timestamp_match(query,reference,verbose=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = "Convert bag dataset to files!")
-    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/uk/orchards/aut22')
+    parser.add_argument("--target_bag_dir",default='/home/tiago/Dropbox/SHARE/DATASET/GEORGIA-FR/husky')
     parser.add_argument("--sync",default=True)
     parser.add_argument("--dst_root",default=None)
     parser.add_argument("--from_file",default="topics2read.yaml")
@@ -457,9 +457,11 @@ if __name__ == '__main__':
     os.makedirs(target_dir,exist_ok=True)
 
     # Read static tf
-    print("Reading static tf...\n")
-    file = os.path.join(target_dir,'static_tf.txt')
-    get_static_tf(bags,static_tf=static_tf,file=file,verbose=True)
+    
+    if len(static_tf.keys()) > 0:
+        print("Reading static tf...\n")
+        file = os.path.join(target_dir,'static_tf.txt')
+        get_static_tf(bags,static_tf=static_tf,file=file,verbose=True)
 
 
     # =====================
